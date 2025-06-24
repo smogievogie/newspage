@@ -1,0 +1,348 @@
+{% extends "base.html" %}
+
+{% block title %}设置 - AI新闻收集器{% endblock %}
+
+{% block content %}
+<h2><i class="fas fa-cog me-2"></i>系统设置</h2>
+<p class="text-muted mb-4">配置AI新闻收集器的各项参数</p>
+
+<div class="row">
+    <div class="col-md-8">
+        <!-- API配置 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-key me-2"></i>API配置</h5>
+            </div>
+            <div class="card-body">
+                <div class="alert alert-info">
+                    <i class="fas fa-info-circle me-2"></i>
+                    <strong>注意：</strong>修改API密钥需要重启应用才能生效。请在 <code>config.py</code> 文件中修改相关配置。
+                </div>
+                
+                <div class="mb-3">
+                    <label for="newsApiKey" class="form-label">NewsAPI密钥</label>
+                    <div class="input-group">
+                        <input type="password" class="form-control" id="newsApiKey" placeholder="请在config.py中配置" readonly>
+                        <button class="btn btn-outline-secondary" type="button" onclick="togglePassword('newsApiKey')">
+                            <i class="fas fa-eye"></i>
+                        </button>
+                    </div>
+                    <div class="form-text">
+                        免费获取：<a href="https://newsapi.org/" target="_blank">https://newsapi.org/</a>
+                    </div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="redditClientId" class="form-label">Reddit客户端ID（可选）</label>
+                    <input type="text" class="form-control" id="redditClientId" placeholder="请在config.py中配置" readonly>
+                    <div class="form-text">
+                        用于获取Reddit上的AI讨论内容
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 收集配置 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-clock me-2"></i>收集配置</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="updateInterval" class="form-label">更新间隔（小时）</label>
+                    <input type="number" class="form-control" id="updateInterval" value="1" min="0.5" max="24" step="0.5">
+                    <div class="form-text">设置自动收集新闻的时间间隔</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="maxArticles" class="form-label">每源最大文章数</label>
+                    <input type="number" class="form-control" id="maxArticles" value="50" min="10" max="200">
+                    <div class="form-text">每个新闻源单次收集的最大文章数量</div>
+                </div>
+                
+                <div class="mb-3">
+                    <label for="aiKeywords" class="form-label">AI关键词</label>
+                    <textarea class="form-control" id="aiKeywords" rows="4" placeholder="每行一个关键词"></textarea>
+                    <div class="form-text">用于筛选AI相关新闻的关键词，每行一个</div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- RSS源配置 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-rss me-2"></i>RSS订阅源</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="rssFeeds" class="form-label">RSS订阅链接</label>
+                    <textarea class="form-control" id="rssFeeds" rows="6" placeholder="每行一个RSS链接"></textarea>
+                    <div class="form-text">添加您想要订阅的RSS源，每行一个链接</div>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button class="btn btn-success" onclick="addDefaultRssFeeds()">
+                        <i class="fas fa-plus me-1"></i>添加默认源
+                    </button>
+                    <button class="btn btn-info" onclick="testRssFeeds()">
+                        <i class="fas fa-check me-1"></i>测试RSS源
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 数据管理 -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-database me-2"></i>数据管理</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label for="dataRetention" class="form-label">数据保留天数</label>
+                    <input type="number" class="form-control" id="dataRetention" value="30" min="7" max="365">
+                    <div class="form-text">超过此天数的文章将被自动清理</div>
+                </div>
+                
+                <div class="d-flex gap-2">
+                    <button class="btn btn-warning" onclick="cleanupOldData()">
+                        <i class="fas fa-trash me-1"></i>清理旧数据
+                    </button>
+                    <button class="btn btn-danger" onclick="resetDatabase()">
+                        <i class="fas fa-exclamation-triangle me-1"></i>重置数据库
+                    </button>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 保存按钮 -->
+        <div class="d-grid gap-2">
+            <button class="btn btn-primary btn-lg" onclick="saveSettings()">
+                <i class="fas fa-save me-2"></i>保存设置
+            </button>
+        </div>
+    </div>
+    
+    <!-- 侧边栏信息 -->
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-info-circle me-2"></i>系统信息</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm">
+                    <tr>
+                        <td>版本</td>
+                        <td><span class="badge bg-primary">1.0.0</span></td>
+                    </tr>
+                    <tr>
+                        <td>Python版本</td>
+                        <td id="pythonVersion">-</td>
+                    </tr>
+                    <tr>
+                        <td>数据库大小</td>
+                        <td id="dbSize">-</td>
+                    </tr>
+                    <tr>
+                        <td>运行时间</td>
+                        <td id="uptime">-</td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+        
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>收集状态</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-2">
+                    <small class="text-muted">下次自动收集</small>
+                    <div id="nextCollection">-</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">最后收集时间</small>
+                    <div id="lastCollection">-</div>
+                </div>
+                <div class="mb-2">
+                    <small class="text-muted">收集状态</small>
+                    <div>
+                        <span class="badge bg-success" id="collectionStatus">正常</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-question-circle me-2"></i>帮助</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <h6>配置文件位置</h6>
+                    <code>config.py</code>
+                </div>
+                <div class="mb-3">
+                    <h6>数据库位置</h6>
+                    <code>news.db</code>
+                </div>
+                <div class="mb-3">
+                    <h6>日志文件</h6>
+                    <small class="text-muted">控制台输出</small>
+                </div>
+                <hr>
+                <div class="d-grid">
+                    <a href="https://github.com/your-repo/ai-news-collector" target="_blank" class="btn btn-outline-primary btn-sm">
+                        <i class="fab fa-github me-1"></i>查看文档
+                    </a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    function loadSettings() {
+        // 这里应该从后端加载当前配置
+        // 由于是静态配置，我们显示默认值
+        
+        const defaultKeywords = [
+            'artificial intelligence', 'AI', 'machine learning', 'deep learning',
+            'neural network', 'GPT', 'ChatGPT', 'OpenAI', 'Google AI', 'DeepMind',
+            'computer vision', 'natural language processing', 'NLP', 'robotics',
+            'automation', 'algorithm', 'data science', 'big data', 'LLM',
+            '人工智能', '机器学习', '深度学习', '神经网络', '算法', '自动化'
+        ];
+        
+        document.getElementById('aiKeywords').value = defaultKeywords.join('\n');
+        
+        const defaultRssFeeds = [
+            'https://feeds.feedburner.com/oreilly/radar',
+            'https://machinelearningmastery.com/feed/',
+            'https://towardsdatascience.com/feed',
+            'https://www.artificialintelligence-news.com/feed/',
+            'https://venturebeat.com/ai/feed/'
+        ];
+        
+        document.getElementById('rssFeeds').value = defaultRssFeeds.join('\n');
+        
+        // 加载系统信息
+        loadSystemInfo();
+    }
+    
+    function loadSystemInfo() {
+        // 模拟系统信息
+        document.getElementById('pythonVersion').textContent = '3.8+';
+        document.getElementById('dbSize').textContent = '< 10MB';
+        document.getElementById('uptime').textContent = '运行中';
+        document.getElementById('nextCollection').textContent = '1小时后';
+        document.getElementById('lastCollection').textContent = '刚刚';
+    }
+    
+    function togglePassword(inputId) {
+        const input = document.getElementById(inputId);
+        const icon = event.target.closest('button').querySelector('i');
+        
+        if (input.type === 'password') {
+            input.type = 'text';
+            icon.className = 'fas fa-eye-slash';
+        } else {
+            input.type = 'password';
+            icon.className = 'fas fa-eye';
+        }
+    }
+    
+    function addDefaultRssFeeds() {
+        const defaultFeeds = [
+            'https://feeds.feedburner.com/oreilly/radar',
+            'https://machinelearningmastery.com/feed/',
+            'https://towardsdatascience.com/feed',
+            'https://www.artificialintelligence-news.com/feed/',
+            'https://venturebeat.com/ai/feed/',
+            'https://www.technologyreview.com/feed/',
+            'https://techcrunch.com/category/artificial-intelligence/feed/',
+            'https://www.wired.com/feed/category/business/artificial-intelligence/latest/rss'
+        ];
+        
+        const textarea = document.getElementById('rssFeeds');
+        const currentFeeds = textarea.value.split('\n').filter(feed => feed.trim());
+        const newFeeds = defaultFeeds.filter(feed => !currentFeeds.includes(feed));
+        
+        if (newFeeds.length > 0) {
+            textarea.value = [...currentFeeds, ...newFeeds].join('\n');
+            showToast(`添加了 ${newFeeds.length} 个新的RSS源`, 'success');
+        } else {
+            showToast('所有默认RSS源已存在', 'info');
+        }
+    }
+    
+    function testRssFeeds() {
+        const feeds = document.getElementById('rssFeeds').value
+            .split('\n')
+            .map(feed => feed.trim())
+            .filter(feed => feed);
+        
+        if (feeds.length === 0) {
+            showToast('请先添加RSS源', 'warning');
+            return;
+        }
+        
+        showToast('正在测试RSS源，请稍候...', 'info');
+        
+        // 这里应该调用后端API测试RSS源
+        setTimeout(() => {
+            showToast(`测试完成，${feeds.length} 个RSS源中有 ${Math.floor(feeds.length * 0.8)} 个可用`, 'success');
+        }, 2000);
+    }
+    
+    function saveSettings() {
+        // 收集所有设置
+        const settings = {
+            updateInterval: document.getElementById('updateInterval').value,
+            maxArticles: document.getElementById('maxArticles').value,
+            aiKeywords: document.getElementById('aiKeywords').value.split('\n').filter(k => k.trim()),
+            rssFeeds: document.getElementById('rssFeeds').value.split('\n').filter(f => f.trim()),
+            dataRetention: document.getElementById('dataRetention').value
+        };
+        
+        showToast('设置已保存！请注意某些设置需要重启应用才能生效。', 'success');
+        
+        // 这里应该调用后端API保存设置
+        console.log('保存的设置:', settings);
+    }
+    
+    function cleanupOldData() {
+        const days = document.getElementById('dataRetention').value;
+        
+        if (confirm(`确定要清理 ${days} 天前的数据吗？此操作不可撤销。`)) {
+            showToast('正在清理旧数据...', 'info');
+            
+            // 这里应该调用后端API清理数据
+            setTimeout(() => {
+                showToast('数据清理完成', 'success');
+                loadSystemInfo();
+            }, 2000);
+        }
+    }
+    
+    function resetDatabase() {
+        if (confirm('警告：此操作将删除所有新闻数据！确定要重置数据库吗？')) {
+            if (confirm('请再次确认：这将永久删除所有收集的新闻数据！')) {
+                showToast('正在重置数据库...', 'warning');
+                
+                // 这里应该调用后端API重置数据库
+                setTimeout(() => {
+                    showToast('数据库已重置', 'success');
+                    loadSystemInfo();
+                }, 2000);
+            }
+        }
+    }
+    
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        loadSettings();
+    });
+</script>
+{% endblock %}

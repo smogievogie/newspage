@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+
+{% block title %}页面未找到 - AI新闻收集器{% endblock %}
+
+{% block content %}
+<div class="text-center py-5">
+    <div class="mb-4">
+        <i class="fas fa-search fa-5x text-muted"></i>
+    </div>
+    <h1 class="display-1 fw-bold text-primary">404</h1>
+    <h2 class="mb-3">页面未找到</h2>
+    <p class="lead text-muted mb-4">
+        抱歉，您访问的页面不存在或已被移动。
+    </p>
+    <div class="d-flex justify-content-center gap-3">
+        <a href="/" class="btn btn-primary">
+            <i class="fas fa-home me-2"></i>返回首页
+        </a>
+        <button class="btn btn-outline-primary" onclick="history.back()">
+            <i class="fas fa-arrow-left me-2"></i>返回上页
+        </button>
+    </div>
+</div>
+{% endblock %}

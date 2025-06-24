@@ -1,0 +1,373 @@
+{% extends "base.html" %}
+
+{% block title %}仪表板 - AI新闻收集器{% endblock %}
+
+{% block content %}
+<h2><i class="fas fa-chart-bar me-2"></i>数据仪表板</h2>
+<p class="text-muted mb-4">AI新闻收集统计与分析</p>
+
+<!-- 统计卡片 -->
+<div class="row mb-4">
+    <div class="col-md-3">
+        <div class="card bg-primary text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 id="totalArticlesCard">-</h4>
+                        <p class="mb-0">总文章数</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-newspaper fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-success text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 id="totalSources">-</h4>
+                        <p class="mb-0">新闻源数量</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-rss fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-info text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 id="trendingCount">-</h4>
+                        <p class="mb-0">热门关键词</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-tags fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-3">
+        <div class="card bg-warning text-white">
+            <div class="card-body">
+                <div class="d-flex justify-content-between">
+                    <div>
+                        <h4 id="lastUpdated">-</h4>
+                        <p class="mb-0">最后更新</p>
+                    </div>
+                    <div class="align-self-center">
+                        <i class="fas fa-clock fa-2x"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 图表区域 -->
+<div class="row mb-4">
+    <div class="col-md-8">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-line me-2"></i>热门关键词分布</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="keywordChart" width="400" height="200"></canvas>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-chart-pie me-2"></i>新闻源分布</h5>
+            </div>
+            <div class="card-body">
+                <canvas id="sourceChart" width="300" height="300"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 最新文章和热门关键词 -->
+<div class="row">
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-star me-2"></i>高相关性文章</h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="topArticles">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i> 加载中...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-6">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-fire me-2"></i>热门关键词详情</h5>
+            </div>
+            <div class="card-body" style="max-height: 400px; overflow-y: auto;">
+                <div id="keywordDetails">
+                    <div class="loading">
+                        <i class="fas fa-spinner fa-spin"></i> 加载中...
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 操作按钮 -->
+<div class="row mt-4">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                <h5 class="mb-0"><i class="fas fa-tools me-2"></i>系统操作</h5>
+            </div>
+            <div class="card-body">
+                <button class="btn btn-primary me-2" onclick="collectNews()">
+                    <i class="fas fa-sync-alt me-1"></i>立即收集新闻
+                </button>
+                <button class="btn btn-info me-2" onclick="refreshDashboard()">
+                    <i class="fas fa-refresh me-1"></i>刷新数据
+                </button>
+                <button class="btn btn-warning me-2" onclick="cleanupOldNews()">
+                    <i class="fas fa-trash me-1"></i>清理旧新闻
+                </button>
+                <button class="btn btn-success" onclick="exportData()">
+                    <i class="fas fa-download me-1"></i>导出数据
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    let keywordChart = null;
+    let sourceChart = null;
+    
+    function loadDashboardData() {
+        // 加载统计信息
+        fetch('/api/stats')
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('totalArticlesCard').textContent = data.total_articles;
+                document.getElementById('totalSources').textContent = data.total_sources;
+                document.getElementById('trendingCount').textContent = data.trending_keywords;
+                
+                const lastUpdated = new Date(data.last_updated);
+                document.getElementById('lastUpdated').textContent = lastUpdated.toLocaleTimeString('zh-CN');
+            })
+            .catch(error => console.error('加载统计信息失败:', error));
+        
+        // 加载热门关键词
+        fetch('/api/trending')
+            .then(response => response.json())
+            .then(data => {
+                createKeywordChart(data.trending);
+                displayKeywordDetails(data.trending);
+            })
+            .catch(error => console.error('加载热门关键词失败:', error));
+        
+        // 加载新闻源
+        fetch('/api/sources')
+            .then(response => response.json())
+            .then(data => {
+                createSourceChart(data.sources);
+            })
+            .catch(error => console.error('加载新闻源失败:', error));
+        
+        // 加载高相关性文章
+        loadTopArticles();
+    }
+    
+    function createKeywordChart(trendingData) {
+        const ctx = document.getElementById('keywordChart').getContext('2d');
+        
+        if (keywordChart) {
+            keywordChart.destroy();
+        }
+        
+        const top10 = trendingData.slice(0, 10);
+        
+        keywordChart = new Chart(ctx, {
+            type: 'bar',
+            data: {
+                labels: top10.map(item => item[0]),
+                datasets: [{
+                    label: '出现次数',
+                    data: top10.map(item => item[1]),
+                    backgroundColor: 'rgba(54, 162, 235, 0.6)',
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                scales: {
+                    y: {
+                        beginAtZero: true
+                    }
+                },
+                plugins: {
+                    legend: {
+                        display: false
+                    }
+                }
+            }
+        });
+    }
+    
+    function createSourceChart(sources) {
+        // 统计每个源的文章数量
+        const sourcePromises = sources.map(source => 
+            fetch(`/api/news?source=${encodeURIComponent(source)}&limit=1`)
+                .then(response => response.json())
+                .then(data => ({ source, count: data.total }))
+        );
+        
+        Promise.all(sourcePromises)
+            .then(sourceCounts => {
+                const ctx = document.getElementById('sourceChart').getContext('2d');
+                
+                if (sourceChart) {
+                    sourceChart.destroy();
+                }
+                
+                const colors = [
+                    '#FF6384', '#36A2EB', '#FFCE56', '#4BC0C0', '#9966FF',
+                    '#FF9F40', '#FF6384', '#C9CBCF', '#4BC0C0', '#FF6384'
+                ];
+                
+                sourceChart = new Chart(ctx, {
+                    type: 'doughnut',
+                    data: {
+                        labels: sourceCounts.map(item => item.source.replace(/^(RSS - |NewsAPI - |Reddit - )/, '')),
+                        datasets: [{
+                            data: sourceCounts.map(item => item.count),
+                            backgroundColor: colors.slice(0, sourceCounts.length),
+                            borderWidth: 2
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            }
+                        }
+                    }
+                });
+            })
+            .catch(error => console.error('创建源分布图失败:', error));
+    }
+    
+    function displayKeywordDetails(trendingData) {
+        const container = document.getElementById('keywordDetails');
+        
+        if (trendingData.length === 0) {
+            container.innerHTML = '<p class="text-muted">暂无热门关键词</p>';
+            return;
+        }
+        
+        const html = trendingData.slice(0, 15).map((item, index) => {
+            const [keyword, count] = item;
+            const percentage = Math.round((count / trendingData[0][1]) * 100);
+            
+            return `
+                <div class="d-flex justify-content-between align-items-center mb-2 p-2 bg-light rounded">
+                    <div>
+                        <span class="badge bg-primary me-2">${index + 1}</span>
+                        <strong>${keyword}</strong>
+                    </div>
+                    <div>
+                        <span class="badge bg-secondary">${count}次</span>
+                        <small class="text-muted ms-1">${percentage}%</small>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        container.innerHTML = html;
+    }
+    
+    function loadTopArticles() {
+        fetch('/api/news?limit=10&order_by=relevance_score DESC')
+            .then(response => response.json())
+            .then(data => {
+                const container = document.getElementById('topArticles');
+                
+                if (data.articles.length === 0) {
+                    container.innerHTML = '<p class="text-muted">暂无文章</p>';
+                    return;
+                }
+                
+                const html = data.articles.map(article => {
+                    const publishedDate = article.published_at ? 
+                        new Date(article.published_at).toLocaleDateString('zh-CN') : '未知';
+                    
+                    return `
+                        <div class="border-bottom pb-2 mb-2">
+                            <h6 class="mb-1">
+                                <a href="${article.url}" target="_blank" class="text-decoration-none">
+                                    ${article.title}
+                                </a>
+                                <span class="badge bg-success ms-2">${article.relevance_score.toFixed(1)}</span>
+                            </h6>
+                            <small class="text-muted">
+                                ${article.source} • ${publishedDate}
+                            </small>
+                        </div>
+                    `;
+                }).join('');
+                
+                container.innerHTML = html;
+            })
+            .catch(error => {
+                document.getElementById('topArticles').innerHTML = 
+                    '<p class="text-danger">加载失败</p>';
+            });
+    }
+    
+    function refreshDashboard() {
+        showToast('正在刷新数据...');
+        loadDashboardData();
+        setTimeout(() => showToast('数据已刷新', 'success'), 1000);
+    }
+    
+    function cleanupOldNews() {
+        if (confirm('确定要清理30天前的旧新闻吗？此操作不可撤销。')) {
+            showToast('清理功能暂未实现', 'info');
+        }
+    }
+    
+    function exportData() {
+        showToast('导出功能暂未实现', 'info');
+    }
+    
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        loadDashboardData();
+        
+        // 每5分钟自动刷新一次数据
+        setInterval(loadDashboardData, 5 * 60 * 1000);
+    });
+</script>
+{% endblock %}

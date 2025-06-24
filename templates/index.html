@@ -1,0 +1,290 @@
+{% extends "base.html" %}
+
+{% block title %}AI新闻收集器 - 最新AI资讯{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="fas fa-newspaper me-2"></i>最新AI资讯</h2>
+    <div class="btn-group" role="group">
+        <button type="button" class="btn btn-outline-primary" onclick="sortBy('published_at DESC')" id="sortTime">
+            <i class="fas fa-clock me-1"></i>按时间
+        </button>
+        <button type="button" class="btn btn-outline-primary" onclick="sortBy('relevance_score DESC')" id="sortRelevance">
+            <i class="fas fa-star me-1"></i>按相关性
+        </button>
+    </div>
+</div>
+
+<!-- 过滤器 -->
+<div class="row mb-3">
+    <div class="col-md-6">
+        <select class="form-select" id="sourceFilter" onchange="filterNews()">
+            <option value="">所有来源</option>
+        </select>
+    </div>
+    <div class="col-md-6">
+        <div class="input-group">
+            <input type="text" class="form-control" placeholder="关键词过滤..." id="keywordFilter">
+            <button class="btn btn-outline-secondary" type="button" onclick="filterNews()">
+                <i class="fas fa-filter"></i>
+            </button>
+        </div>
+    </div>
+</div>
+
+<!-- 新闻列表 -->
+<div id="newsContainer">
+    <div class="loading">
+        <i class="fas fa-spinner fa-spin fa-2x"></i>
+        <p class="mt-2">正在加载最新AI资讯...</p>
+    </div>
+</div>
+
+<!-- 分页 -->
+<nav aria-label="新闻分页" id="paginationContainer" style="display: none;">
+    <ul class="pagination justify-content-center" id="pagination">
+        <!-- 分页按钮将通过JavaScript生成 -->
+    </ul>
+</nav>
+
+<!-- 加载更多按钮 -->
+<div class="text-center mt-4" id="loadMoreContainer" style="display: none;">
+    <button class="btn btn-primary" onclick="loadMore()" id="loadMoreBtn">
+        <i class="fas fa-plus me-1"></i>加载更多
+    </button>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let currentPage = 1;
+    let currentSort = 'published_at DESC';
+    let currentSource = '';
+    let currentKeyword = '';
+    let totalPages = 1;
+    let loading = false;
+    
+    // 从URL参数获取初始过滤条件
+    function getUrlParams() {
+        const urlParams = new URLSearchParams(window.location.search);
+        currentSource = urlParams.get('source') || '';
+        currentKeyword = urlParams.get('keyword') || '';
+        
+        if (currentKeyword) {
+            document.getElementById('keywordFilter').value = currentKeyword;
+        }
+    }
+    
+    function loadNews(page = 1, append = false) {
+        if (loading) return;
+        loading = true;
+        
+        const params = new URLSearchParams({
+            page: page,
+            limit: 20,
+            order_by: currentSort
+        });
+        
+        if (currentSource) params.append('source', currentSource);
+        if (currentKeyword) params.append('keyword', currentKeyword);
+        
+        fetch(`/api/news?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                displayNews(data.articles, append);
+                updatePagination(data.page, data.total_pages);
+                currentPage = data.page;
+                totalPages = data.total_pages;
+                loading = false;
+            })
+            .catch(error => {
+                console.error('加载新闻失败:', error);
+                document.getElementById('newsContainer').innerHTML = 
+                    '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>加载失败，请稍后重试</div>';
+                loading = false;
+            });
+    }
+    
+    function displayNews(articles, append = false) {
+        const container = document.getElementById('newsContainer');
+        
+        if (articles.length === 0) {
+            container.innerHTML = '<div class="alert alert-info"><i class="fas fa-info-circle me-2"></i>暂无相关新闻</div>';
+            return;
+        }
+        
+        const newsHtml = articles.map(article => {
+            const publishedDate = article.published_at ? 
+                new Date(article.published_at).toLocaleString('zh-CN') : '未知时间';
+            
+            const keywords = article.keywords || [];
+            const keywordTags = keywords.slice(0, 5).map(keyword => 
+                `<span class="keyword-tag">${keyword}</span>`
+            ).join('');
+            
+            return `
+                <div class="card news-card mb-3">
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between align-items-start mb-2">
+                            <h5 class="card-title mb-0">
+                                <a href="${article.url}" target="_blank" class="text-decoration-none">
+                                    ${article.title}
+                                </a>
+                            </h5>
+                            <span class="relevance-score">${article.relevance_score.toFixed(1)}</span>
+                        </div>
+                        
+                        <p class="card-text text-muted">${article.description || '暂无描述'}</p>
+                        
+                        <div class="d-flex justify-content-between align-items-center">
+                            <div>
+                                <span class="badge bg-primary source-badge me-2">${article.source}</span>
+                                <small class="text-muted">
+                                    <i class="fas fa-clock me-1"></i>${publishedDate}
+                                </small>
+                                ${article.author ? `<small class="text-muted ms-2"><i class="fas fa-user me-1"></i>${article.author}</small>` : ''}
+                            </div>
+                            <div>
+                                <button class="btn btn-sm btn-outline-primary" onclick="markAsRead(${article.id})">
+                                    <i class="fas fa-check me-1"></i>标记已读
+                                </button>
+                            </div>
+                        </div>
+                        
+                        ${keywordTags ? `<div class="mt-2">${keywordTags}</div>` : ''}
+                    </div>
+                    ${article.image_url ? `<img src="${article.image_url}" class="card-img-bottom" style="max-height: 200px; object-fit: cover;" onerror="this.style.display='none'">` : ''}
+                </div>
+            `;
+        }).join('');
+        
+        if (append) {
+            container.innerHTML += newsHtml;
+        } else {
+            container.innerHTML = newsHtml;
+        }
+        
+        // 更新加载更多按钮
+        const loadMoreContainer = document.getElementById('loadMoreContainer');
+        if (currentPage < totalPages) {
+            loadMoreContainer.style.display = 'block';
+        } else {
+            loadMoreContainer.style.display = 'none';
+        }
+    }
+    
+    function updatePagination(page, totalPages) {
+        const paginationContainer = document.getElementById('paginationContainer');
+        const pagination = document.getElementById('pagination');
+        
+        if (totalPages <= 1) {
+            paginationContainer.style.display = 'none';
+            return;
+        }
+        
+        paginationContainer.style.display = 'block';
+        
+        let paginationHtml = '';
+        
+        // 上一页
+        if (page > 1) {
+            paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadNews(${page - 1})">上一页</a></li>`;
+        }
+        
+        // 页码
+        const startPage = Math.max(1, page - 2);
+        const endPage = Math.min(totalPages, page + 2);
+        
+        for (let i = startPage; i <= endPage; i++) {
+            const activeClass = i === page ? 'active' : '';
+            paginationHtml += `<li class="page-item ${activeClass}"><a class="page-link" href="#" onclick="loadNews(${i})">${i}</a></li>`;
+        }
+        
+        // 下一页
+        if (page < totalPages) {
+            paginationHtml += `<li class="page-item"><a class="page-link" href="#" onclick="loadNews(${page + 1})">下一页</a></li>`;
+        }
+        
+        pagination.innerHTML = paginationHtml;
+    }
+    
+    function sortBy(order) {
+        currentSort = order;
+        currentPage = 1;
+        
+        // 更新按钮状态
+        document.querySelectorAll('.btn-group .btn').forEach(btn => btn.classList.remove('active'));
+        if (order === 'published_at DESC') {
+            document.getElementById('sortTime').classList.add('active');
+        } else {
+            document.getElementById('sortRelevance').classList.add('active');
+        }
+        
+        loadNews(1);
+    }
+    
+    function filterNews() {
+        currentSource = document.getElementById('sourceFilter').value;
+        currentKeyword = document.getElementById('keywordFilter').value;
+        currentPage = 1;
+        loadNews(1);
+    }
+    
+    function loadMore() {
+        if (currentPage < totalPages) {
+            loadNews(currentPage + 1, true);
+        }
+    }
+    
+    function markAsRead(articleId) {
+        fetch(`/api/article/${articleId}/read`, { method: 'POST' })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    showToast('已标记为已读', 'success');
+                } else {
+                    showToast('操作失败', 'error');
+                }
+            })
+            .catch(error => {
+                showToast('操作失败: ' + error.message, 'error');
+            });
+    }
+    
+    // 加载新闻源到下拉框
+    function loadSourcesFilter() {
+        fetch('/api/sources')
+            .then(response => response.json())
+            .then(data => {
+                const select = document.getElementById('sourceFilter');
+                data.sources.forEach(source => {
+                    const option = document.createElement('option');
+                    option.value = source;
+                    option.textContent = source;
+                    if (source === currentSource) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            })
+            .catch(error => console.error('加载新闻源失败:', error));
+    }
+    
+    // 页面加载完成后执行
+    document.addEventListener('DOMContentLoaded', function() {
+        getUrlParams();
+        loadSourcesFilter();
+        loadNews(1);
+        
+        // 设置默认排序按钮状态
+        document.getElementById('sortTime').classList.add('active');
+        
+        // 关键词过滤器回车事件
+        document.getElementById('keywordFilter').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                filterNews();
+            }
+        });
+    });
+</script>
+{% endblock %}
